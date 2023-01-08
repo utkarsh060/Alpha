@@ -13,7 +13,7 @@ newspaper3k==0.2.8
 seaborn==0.11.1
 matplotlib==3.4.1
 requests==2.24.0
-GoogleNews==1.5.7
+GoogleNews==1.6.6
 vaderSentiment==3.3.2
 pyportfolioopt==1.4.1
 yfinance==0.1.63 
