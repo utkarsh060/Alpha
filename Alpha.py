@@ -969,10 +969,11 @@ try:
             st.line_chart(data['OBV'])
 
             #aroon
-            data['aroondown'], data['aroonup'] = ta.aroon(high=data['High'], low=data['Low'], length=14)
+            aroon = ta.aroon(high=data['High'], low=data['Low'], length=14)
+            data = pd.concat([data, aroon], axis=1).reindex(data.index)
             
             st.header("AROON")
-            st.line_chart(data[['aroondown', 'aroonup']])
+            st.line_chart(data[['AROOND_14', 'AROONU_14']])
 
             #Ultimate oscilator
             data['Ultimate'] = ta.uo(high=data['High'], low=data['Low'], close=data['Adj Close'])            
