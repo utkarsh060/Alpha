@@ -17,4 +17,4 @@ GoogleNews==1.5.7
 vaderSentiment==3.3.2
 pyportfolioopt==1.4.1
 yfinance==0.1.63 
-
+pandas-ta==0.3.14b0

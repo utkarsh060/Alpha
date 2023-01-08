@@ -20,7 +20,7 @@ import streamlit as st
 import tweepy
 import re
 from wordcloud import WordCloud, STOPWORDS
-import os, sys
+import sys
 from os import environ
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from GoogleNews import GoogleNews
@@ -34,44 +34,7 @@ from pypfopt import  risk_models
 from pypfopt import expected_returns
 from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 
-import subprocess
-
-# check if the library folder already exists, to avoid building everytime you load the pahe
-if not os.path.isdir("/tmp/ta-lib"):
-
-    # Download ta-lib to disk
-    with open("/tmp/ta-lib-0.4.0-src.tar.gz", "wb") as file:
-        response = requests.get(
-            "http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz"
-        )
-        file.write(response.content)
-    # get our current dir, to configure it back again. Just house keeping
-    default_cwd = os.getcwd()
-    os.chdir("/tmp")
-    # untar
-    os.system("tar -zxvf ta-lib-0.4.0-src.tar.gz")
-    os.chdir("/tmp/ta-lib")
-    os.system("ls -la /app/equity/")
-    # build
-    os.system("./configure --prefix=/home/appuser")
-    os.system("make")
-    # install
-    os.system("make install")
-    # back to the cwd
-    os.chdir(default_cwd)
-    sys.stdout.flush()
-
-# add the library to our current environment
-from ctypes import *
-
-lib = CDLL("/home/appuser/lib/libta_lib.so.0.0.0")
-# import library
-try:
-    import talib
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "--global-option=build_ext", "--global-option=-L/home/appuser/lib/", "--global-option=-I/home/appuser/include/", "ta-lib"])
-finally:
-    import talib
+import pandas_ta as ta
 
 from fbprophet import Prophet
 from fbprophet.plot import plot_plotly
@@ -610,9 +573,9 @@ try:
             # MA with 30 day window
             st.markdown("Indicators with buy and sell signal")
 
-            data['SMA 30'] = talib.SMA(data['Adj Close'], timeperiod = 30)
+            data['SMA 30'] = ta.sma(data['Adj Close'], length = 30)
 
-            data['SMA 100'] = talib.SMA(data['Adj Close'], timeperiod = 100)
+            data['SMA 100'] = ta.sma(data['Adj Close'], length = 100)
 
             #SMA BUY SELL
             #Function for buy and sell signal
@@ -724,8 +687,8 @@ try:
 
             st.header("Buy and Sell startegy as per Heiken-Ashi")
             st.subheader("Disclamer- This is just for educational purposes not an investment advice!")
-            HA['DEMA_short'] = talib.DEMA(HA['HA_close'], timeperiod=25)
-            data['DEMA_long'] = talib.DEMA(data['Adj Close'], timeperiod=52)
+            HA['DEMA_short'] = ta.dema(HA['HA_close'], length=25)
+            data['DEMA_long'] = ta.dema(data['Adj Close'], length=52)
             fig, ax = plt.subplots(figsize=(14,8))
             ax.plot(data['Adj Close'] , label = selected_stocks ,linewidth=0.5, color='blue', alpha = 1)
             ax.scatter(HA.index , HA['buy here'] , label = 'Buy' , marker = '^', color = 'green' ,alpha =1 )
@@ -901,12 +864,13 @@ try:
                 bbBuy = []
                 bbSell = []
                 flag = False
-                data['upper_band'], data['middle_band'], data['lower_band'] = talib.BBANDS(data['Adj Close'], timeperiod =20)
+                bb = ta.bbands(data['Adj Close'], 20, 2)
+                data = pd.concat([data, bb], axis=1).reindex(data.index)
 
                 #Flag is gonna tell us when the 2 SMA are crossing each other, -1 = False
 
                 for i in range(len(data)):
-                    if data['Adj Close'][i] < data['lower_band'][i]:
+                    if data['Adj Close'][i] < data['BBL_20_2.0'][i]:
                         if flag == False :
                             bbBuy.append(data['Adj Close'][i])
                             bbSell.append(np.nan)
@@ -914,7 +878,7 @@ try:
                         else:
                             bbBuy.append(np.nan)
                             bbSell.append(np.nan)
-                    elif data['Adj Close'][i] > data['upper_band'][i]:
+                    elif data['Adj Close'][i] > data['BBU_20_2.0'][i]:
                         if flag == True:
                             bbBuy.append(np.nan)
                             bbSell.append(data['Adj Close'][i])
@@ -950,44 +914,43 @@ try:
             ax1.grid()
             ax1.set_xlabel('Date', fontsize=8)
 
-            ax2.plot(data['middle_band'], label='Middle', color='blue', alpha=0.35)
-            ax2.plot(data['upper_band'], label='Upper', color='green', alpha=0.35)
-            ax2.plot(data['lower_band'], label='Lower', color='red', alpha=0.35)
-            ax2.fill_between(data.index, data['lower_band'], data['upper_band'], alpha=0.1)
+            ax2.plot(data['BBM_20_2.0'], label='Middle', color='blue', alpha=0.35)
+            ax2.plot(data['BBU_20_2.0'], label='Upper', color='green', alpha=0.35)
+            ax2.plot(data['BBL_20_2.0'], label='Lower', color='red', alpha=0.35)
+            ax2.fill_between(data.index, data['BBL_20_2.0'], data['BBU_20_2.0'], alpha=0.1)
             ax2.legend(loc='upper left')
             ax2.grid()
             st.pyplot(fig)
 
-
-
-
             #Simple Moving Average
-            data['SMA20'] = talib.SMA(data['Adj Close'], timeperiod = 20)
+            data['SMA20'] = ta.sma(data['Adj Close'], length = 20)
 
             # Exponential Moving Average
-            data['EMA50'] = talib.EMA(data['Adj Close'], timeperiod = 50)
+            data['EMA50'] = ta.ema(data['Adj Close'], length = 50)            
 
             # Plot
             st.header("Simple Moving Average vs. Exponential Moving Average")
             st.line_chart(data[['Adj Close','SMA20','EMA50']])
 
             # Bollinger Bands
-            data['upper_band'], data['middle_band'], data['lower_band'] = talib.BBANDS(data['Adj Close'], timeperiod =20)
+            # bb = ta.bbands(data['Adj Close'], 20, 2)
+            # data = pd.concat([data, bb], axis=1).reindex(data.index)
 
             # Plot
             st.header("Bollinger Bands")
-            st.line_chart(data[['Adj Close','upper_band','middle_band','lower_band']])
+            st.line_chart(data[['Adj Close','BBU_20_2.0', 'BBM_20_2.0',	'BBL_20_2.0']])
 
             # ## MACD (Moving Average Convergence Divergence)
             # MACD
-            data['macd'], data['macdsignal'], data['macdhist'] = talib.MACD(data['Adj Close'], fastperiod=12, slowperiod=26, signalperiod=9)
+            macd = ta.macd(data['Adj Close'], fast=12, slow=26, signal=9)
+            data = pd.concat([data, macd], axis=1).reindex(data.index)
 
             # Plot
             st.header("Moving Average Convergence Divergence")
-            st.line_chart(data[['macd','macdsignal']])
+            st.line_chart(data[['MACD_12_26_9','MACDs_12_26_9']])
 
             ## CCI (Commodity Channel Index)
-            cci = talib.CCI(data['High'], data['Low'], data['Adj Close'], timeperiod=14)
+            cci = ta.cci(high=data['High'], low=data['Low'], close=data['Adj Close'], length=14)
 
             # Plot
             st.header("Commodity Channel Index")
@@ -995,7 +958,7 @@ try:
 
             # ## RSI (Relative Strength Index)
             # RSI
-            data['RSI'] = talib.RSI(data['Adj Close'], timeperiod=14)
+            data['RSI'] = ta.rsi(data['Adj Close'], length=14)            
 
             # Plot
             st.header("Relative Strength Index")
@@ -1003,268 +966,48 @@ try:
 
             # ## OBV (On Balance Volume)
             # OBV
-            data['OBV'] = talib.OBV(data['Adj Close'], data['Volume'])/10**6
+            data['OBV'] = ta.obv(data['Adj Close'], data['Volume'])/10**6            
 
             # Plot
             st.header("On Balance Volume")
             st.line_chart(data['OBV'])
 
             #aroon
-            data['aroondown'], data['aroonup'] = talib.AROON(data['High'], data['Low'], timeperiod=14)
-
+            data['aroondown'], data['aroonup'] = ta.aroon(high=data['High'], low=data['Low'], length=14)
+            
             st.header("AROON")
             st.line_chart(data[['aroondown', 'aroonup']])
 
             #Ultimate oscilator
-            data['Ultimate'] = talib.ULTOSC(data['High'], data['Low'], data['Adj Close'], timeperiod1=7, timeperiod2=14, timeperiod3=28)
+            data['Ultimate'] = ta.uo(high=data['High'], low=data['Low'], close=data['Adj Close'])            
 
             st.header("Ultimate Oscilator")
             st.line_chart(data['Ultimate'])
 
             #william r
-            data['Will'] = talib.WILLR(data['High'], data['Low'], data['Adj Close'], timeperiod=14)
-
+            data['Will'] = ta.willr(high=data['High'], low=data['Low'], close=data['Adj Close'], length=30)
+            
             st.header("William %R")
             st.line_chart(data['Will'])
 
             #Trix
-            data['TRIX'] = talib.TRIX(data['Adj Close'], timeperiod=30)
-
+            data['TRIX'] = ta.trix(close=data['Adj Close'], length=30)
 
             st.header("TRIX - 1-day Rate-Of-Change (ROC) of a Triple Smooth EMA")
             st.line_chart(data['TRIX'])
 
             #PPO
-            data['PPO'] = talib.PPO(data['Adj Close'], fastperiod=12, slowperiod=26, matype=0)
+            data['PPO'] = ta.ppo(close=data['Adj Close'], fast=12, slow=26)
 
             st.header("Percentage Price Oscillator")
             st.line_chart(data['PPO'])
 
             #kama
-
-            data['kama'] = talib.KAMA(data['Adj Close'], timeperiod=30)
+            
+            data['kama'] = ta.kama(close=data['Adj Close'], length=30)
 
             st.header("Kaufman Adaptive Moving Average")
             st.line_chart(data['kama'])
-
-
-
-
-            #Pattern Recognition
-
-            st.header('Pattern Recognition')
-
-            def count(pattern,name):
-                b = []
-                a = []
-                for i in pattern:
-                    if i != 0:
-                        b.append(i)
-
-                ptrn_count = (name , len(b))
-
-                ptrn = pattern[pattern != 0]
-                st.write(ptrn_count)
-                st.write(ptrn)
-
-            st.subheader("100 signals bullish trend, -100 signals bearish trend ")
-
-            def count_patterns(data_A):
-
-                CDLMORNINGDOJISTAR = talib.CDLMORNINGDOJISTAR(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'], penetration=0)
-                count(CDLMORNINGDOJISTAR,'MORNINGDOJISTAR - Morning Doji Star')
-
-                CDLMORNINGSTAR = talib.CDLMORNINGSTAR(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'], penetration=0)
-                count(CDLMORNINGSTAR,'MORNINGSTAR - Morning Star')
-
-                CDLEVENINGDOJISTAR = talib.CDLEVENINGDOJISTAR(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'], penetration=0)
-                count(CDLEVENINGDOJISTAR,'EVENINGDOJISTAR - Evening Doji Star')
-
-                CDLEVENINGSTAR = talib.CDLEVENINGSTAR(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'], penetration=0)
-                count(CDLEVENINGSTAR,'EVENINGSTAR - Evening Star')
-
-                CDLDOJI = talib.CDLDOJI(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLDOJI,'DOJI - Doji')
-
-                CDLDOJISTAR = talib.CDLDOJISTAR(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLDOJISTAR,'DOJISTAR - Doji Star')
-
-                CDLSHOOTINGSTAR = talib.CDLSHOOTINGSTAR(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLSHOOTINGSTAR,'SHOOTINGSTAR - Shooting Star')
-
-                CDLGRAVESTONEDOJI = talib.CDLGRAVESTONEDOJI(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLGRAVESTONEDOJI,'GRAVESTONEDOJI - Gravestone Doji')
-
-                CDLDRAGONFLYDOJI = talib.CDLDRAGONFLYDOJI(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLDRAGONFLYDOJI,'DRAGONFLYDOJI - Dragonfly Doji')
-
-                CDLLONGLEGGEDDOJI = talib.CDLLONGLEGGEDDOJI(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLLONGLEGGEDDOJI,'LONGLEGGEDDOJI - Long Legged Doji')
-
-                CDLHAMMER = talib.CDLHAMMER(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLHAMMER,'HAMMER - Hammer')
-
-                CDLENGULFING = talib.CDLENGULFING(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLENGULFING,'ENGULFING - Engulfing Pattern')
-
-                CDLHARAMI = talib.CDLHARAMI(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLHARAMI,'HARAMI')
-
-                CDLHIGHWAVE = talib.CDLHIGHWAVE(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLHIGHWAVE,'HIGHWAVE')
-
-                CDLHIKKAKEMOD = talib.CDLHIKKAKEMOD(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLHIKKAKEMOD,'HIKKAKEMOD')
-
-                '''----------------------------------------------------------------------------------'''   
-                CDL2CROWS = talib.CDL2CROWS(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDL2CROWS, '2CROWS - Two Crows')
-
-                CDLCONCEALBABYSWALL = talib.CDLCONCEALBABYSWALL(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLCONCEALBABYSWALL,'CONCEALBABYSWALL - Concealing Baby Swallow')
-
-                CDLHARAMICROSS = talib.CDLHARAMICROSS(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLHARAMICROSS,'HARAMICROSS')
-
-                CDLHOMINGPIGEON = talib.CDLHOMINGPIGEON(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLHOMINGPIGEON,'HOMINGPIGEON')
-
-                CDLINVERTEDHAMMER = talib.CDLINVERTEDHAMMER(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLINVERTEDHAMMER,'INVERTEDHAMMER')
-
-                CDLHANGINGMAN = talib.CDLHANGINGMAN(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLHANGINGMAN,'HANGINGMAN - Hanging Man')
-
-                CDLINNECK = talib.CDLINNECK(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLINNECK,'INNECK - In-Neck Pattern')
-
-                CDL3BLACKCROWS = talib.CDL3BLACKCROWS(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDL3BLACKCROWS,'3BLACKCROWS - Three Black Crows')
-
-                CDLKICKING = talib.CDLKICKING(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLKICKING,'KICKING')
-
-                CDLDARKCLOUDCOVER = talib.CDLDARKCLOUDCOVER(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'], penetration=0)
-                count(CDLDARKCLOUDCOVER,'DARKCLOUDCOVER - Dark Cloud Cover')
-
-                CDLONNECK = talib.CDLONNECK(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLONNECK,'ONNECK - On-Neck Pattern')
-
-                CDLRISEFALL3METHODS = talib.CDLRISEFALL3METHODS(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLRISEFALL3METHODS,'RISEFALL3METHODS - Rising/Falling Three Methods')
-
-                CDLIDENTICAL3CROWS = talib.CDLIDENTICAL3CROWS(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLIDENTICAL3CROWS,'IDENTICAL3CROWS')
-
-                CDLKICKINGBYLENGTH = talib.CDLKICKINGBYLENGTH(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLKICKINGBYLENGTH,'KICKINGBYLENGTH')
-
-                CDL3STARSINSOUTH = talib.CDL3STARSINSOUTH(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDL3STARSINSOUTH,'3STARSINSOUTH - Three Stars In The South')
-
-                CDL3WHITESOLDIERS = talib.CDL3WHITESOLDIERS(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDL3WHITESOLDIERS,'3WHITESOLDIERS - Three Advancing White Soldiers')
-
-                CDLMATHOLD = talib.CDLMATHOLD(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'], penetration=0)
-                count(CDLMATHOLD,'MATHOLD - Mat Hold')
-
-                CDLUPSIDEGAP2CROWS = talib.CDLUPSIDEGAP2CROWS(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLUPSIDEGAP2CROWS,'CDLUPSIDEGAP2CROWS - Upside Gap Two Crows')
-
-                CDLSTALLEDPATTERN = talib.CDLSTALLEDPATTERN(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLSTALLEDPATTERN,'STALLEDPATTERN - Stalled Pattern')
-
-                CDLTHRUSTING = talib.CDLTHRUSTING(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLTHRUSTING,'THRUSTING - Thrusting Pattern')
-
-                CDLADVANCEBLOCK = talib.CDLADVANCEBLOCK(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLADVANCEBLOCK,'ADVANCEBLOCK - Advance Block')
-                '''----------------------------------------------------------------------------------'''   
-                CDLLADDERBOTTOM = talib.CDLLADDERBOTTOM(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLLADDERBOTTOM,'LADDERBOTTOM')
-
-                CDL3INSIDE = talib.CDL3INSIDE(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDL3INSIDE,'3INSIDE - Three Inside Up/Down')
-
-
-                CDL3LINESTRIKE = talib.CDL3LINESTRIKE(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDL3LINESTRIKE,'3LINESTRIKE - Three-Line Strike')
-
-                CDL3OUTSIDE = talib.CDL3OUTSIDE(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDL3OUTSIDE,'3OUTSIDE - Three Outside Up/Down')
-
-
-                CDLBREAKAWAY = talib.CDLBREAKAWAY(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLBREAKAWAY,'BREAKAWAY - Breakaway')
-
-                CDLCLOSINGMARUBOZU = talib.CDLCLOSINGMARUBOZU(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLCLOSINGMARUBOZU,'CLOSINGMARUBOZU - Closing Marubozu')
-
-
-                CDLCOUNTERATTACK = talib.CDLCOUNTERATTACK(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLCOUNTERATTACK,'COUNTERATTACK - Counterattack')
-
-
-                CDLGAPSIDESIDEWHITE = talib.CDLGAPSIDESIDEWHITE(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLGAPSIDESIDEWHITE,'GAPSIDESIDEWHITE - Up/Down-gap side-by-side white lines')
-
-
-                CDLMATCHINGLOW = talib.CDLMATCHINGLOW(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLMATCHINGLOW,'MATCHINGLOW - Matching Low')
-
-
-                CDLPIERCING = talib.CDLPIERCING(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLPIERCING,'PIERCING - Piercing Pattern')
-
-                CDLSEPARATINGLINES = talib.CDLSEPARATINGLINES(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLSEPARATINGLINES,'SEPARATINGLINES - Separating Lines')
-
-                CDLSHORTLINE = talib.CDLSHORTLINE(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLSHORTLINE,'SHORTLINE - Short Line Candle')
-
-                CDLSTICKSANDWICH = talib.CDLSTICKSANDWICH(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLSTICKSANDWICH,'STICKSANDWICH - Stick Sandwich')
-
-                CDLXSIDEGAP3METHODS = talib.CDLXSIDEGAP3METHODS(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLXSIDEGAP3METHODS,'XSIDEGAP3METHODS - Upside/Downside Gap Three Methods')
-
-
-                CDLTASUKIGAP = talib.CDLTASUKIGAP(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLTASUKIGAP,'TASUKIGAP - Tasuki Gap')
-
-
-                CDLTRISTAR = talib.CDLTRISTAR(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLTRISTAR,'TRISTAR - Tristar Pattern')
-
-
-                CDLUNIQUE3RIVER = talib.CDLUNIQUE3RIVER(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLUNIQUE3RIVER,'UNIQUE3RIVER - Unique 3 River')
-
-                CDLABANDONEDBABY = talib.CDLABANDONEDBABY(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'], penetration=0)
-                count(CDLABANDONEDBABY,'ABANDONEDBABY - Abandoned Baby')
-
-                CDLTAKURI = talib.CDLTAKURI(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLTAKURI,'TAKURI - Takuri (Dragonfly Doji with very long lower shadow)')
-
-                CDLHIKKAKE = talib.CDLHIKKAKE(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLHIKKAKE,'HIKKAKE')
-
-                CDLRICKSHAWMAN = talib.CDLRICKSHAWMAN(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLRICKSHAWMAN,'RICKSHAWMAN - Rickshaw Man')
-
-                CDLMARUBOZU = talib.CDLMARUBOZU(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLMARUBOZU,'MARUBOZU - Marubozu')
-
-                CDLBELTHOLD = talib.CDLBELTHOLD(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLBELTHOLD,'BELTHOLD - Belt-hold')
-
-                CDLSPINNINGTOP = talib.CDLSPINNINGTOP(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLSPINNINGTOP,'SPINNINGTOP - Spinning Top')
-
-                CDLLONGLINE = talib.CDLLONGLINE(data_A['Open'],data_A['High'],data_A['Low'],data_A['Adj Close'])
-                count(CDLLONGLINE,'LONGLINE - Long Line Candle')
-
-            st.write(count_patterns(data))
 
             #Candle stick
             candlestick = go.Candlestick(
