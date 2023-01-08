@@ -147,7 +147,7 @@ today = datetime.today().strftime('%Y-%m-%d')
 # In[8]:
 
 
-start_date = st.sidebar.text_input("Start Date(YYYY-MM-DD)", '2019-01-01')
+start_date = st.sidebar.text_input("Start Date(YYYY-MM-DD)", '2022-01-01')
 end_date = st.sidebar.text_input("End Date(YYYY-MM-DD)", f'{today}')
 st.sidebar.header("Contact 📝")
 st.sidebar.warning(
@@ -855,7 +855,6 @@ try:
             ax2.grid()
             st.pyplot(fig)
 
-
             st.write(data['MACD_Buy_Signal_price'].tail())
             st.write(data['MACD_Sell_Signal_price'].tail())
 
@@ -892,10 +891,10 @@ try:
 
                 data['bb_Buy_Signal_price'] = bbBuy
                 data['bb_Sell_Signal_price'] = bbSell
+                
+                return data
 
-
-            #storing the function
-            bb_strategy = bb_strategy(data)
+            data = bb_strategy(data)
 
             st.header("Buy and Sell startegy as per Bollinger Bands startegy")
             st.subheader("Disclamer- This is just for educational purposes not an investment advice")
@@ -933,9 +932,6 @@ try:
             st.line_chart(data[['Adj Close','SMA20','EMA50']])
 
             # Bollinger Bands
-            # bb = ta.bbands(data['Adj Close'], 20, 2)
-            # data = pd.concat([data, bb], axis=1).reindex(data.index)
-
             # Plot
             st.header("Bollinger Bands")
             st.line_chart(data[['Adj Close','BBU_20_2.0', 'BBM_20_2.0',	'BBL_20_2.0']])
