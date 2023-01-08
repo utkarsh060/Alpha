@@ -458,7 +458,7 @@ try:
                     # word cloud visualization
                     def news_cloud(text):
                         stopwords = set(STOPWORDS)
-                        N_allWords = " ".join(list(text))
+                        N_allWords = ' '.join([nws for nws in text])
                         newsCloud = WordCloud(
                             background_color="black",
                             width=1600,
