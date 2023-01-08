@@ -479,16 +479,14 @@ try:
                 ax.set_ylabel('Growth of ₨ 1 investment')
                 st.pyplot(fig)
 
-
                 #Optimization
                 # optimize for maximal sharpe ratio
                 # calculating expected annual return and annualized sample covariance matrix of daily assets returns
 
                 mean = expected_returns.mean_historical_return(df_main)
-
+                
                 S = risk_models.sample_cov(df_main) # for sample covariance matrix
-
-
+                
                 # sharpe ratio describes that how much excess return you receive for the extra volatily you endure for holding a risky asset
                 ef = EfficientFrontier(mean,S)
                 weights = ef.max_sharpe() #for maximizing the sharpe ratio
@@ -516,8 +514,6 @@ try:
                     weights = cleaned_weights
                     discrete_allocation = DiscreteAllocation(weights, latest_prices , total_portfolio_value = int(portfolio_amount))
                     allocation , leftover = discrete_allocation.lp_portfolio()
-
-
 
                     #function to get the co.s name
 
@@ -988,16 +984,18 @@ try:
             st.line_chart(data['Will'])
 
             #Trix
-            data['TRIX'] = ta.trix(close=data['Adj Close'], length=30)
+            trix = ta.trix(close=data['Adj Close'], length=30)
+            data = pd.concat([data, trix], axis=1).reindex(data.index)
 
             st.header("TRIX - 1-day Rate-Of-Change (ROC) of a Triple Smooth EMA")
-            st.line_chart(data['TRIX'])
+            st.line_chart(data['TRIX_30_9'])
 
             #PPO
-            data['PPO'] = ta.ppo(close=data['Adj Close'], fast=12, slow=26)
+            ppo = ta.ppo(close=data['Adj Close'], fast=12, slow=26)
+            data = pd.concat([data, ppo], axis=1).reindex(data.index)
 
             st.header("Percentage Price Oscillator")
-            st.line_chart(data['PPO'])
+            st.line_chart(data['PPO_12_26_9'])
 
             #kama
             
