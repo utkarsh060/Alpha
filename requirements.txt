@@ -6,6 +6,7 @@ wordcloud==1.8.1
 tweepy==3.10.0
 nltk==3.5
 plotly==4.14.3
+holidays==0.24
 fbprophet==0.7.1
 pandas_datareader==0.10.0
 cvxopt==1.2.6
